@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robotic_arm_backend"
+version = "2.0.0"
+description = "Full-Stack Vision-Guided Waste Segregation Robotic Manipulator Backend (Phase 1 & Phase 2)"
+authors = [{ name = "Google DeepMind Advanced Agentic Coding Team" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.22.0",
+    "sqlalchemy>=2.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "websockets>=11.0",
+    "opencv-python>=4.7.0",
+    "pillow>=9.5.0",
+    "pyserial>=3.5",
+    "numpy>=1.24.0",
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "ultralytics>=8.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "httpx>=0.24.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "phase1*", "phase2*", "robotics*", "ml*", "hardware*", "services*"]
