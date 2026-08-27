@@ -11,10 +11,24 @@ from backend.app.database import init_db, get_db, Detection, SystemLog, UserActi
 from backend.app.state_manager import state_manager, CODE_TO_CATEGORY, CATEGORY_TO_CODE
 from backend.app.vision_service import vision_service
 
+import asyncio
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    state_manager.set_event_loop(asyncio.get_running_loop())
+    init_db()
+    vision_service.start()
+    yield
+    # Shutdown
+    vision_service.stop()
+
 app = FastAPI(
     title="Veg QX — Robotic Arm Sorter IoT API",
     description="Full-Stack Backend API & Real-time WebSockets for Vision-Guided Waste Segregation System",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
 
 # Enable CORS for Next.js frontend (http://localhost:3000) and dev clients
@@ -35,16 +49,7 @@ class ManualControlRequest(BaseModel):
 class ModeRequest(BaseModel):
     mode: str
 
-@app.on_event("startup")
-async def startup_event():
-    import asyncio
-    state_manager.set_event_loop(asyncio.get_running_loop())
-    init_db()
-    vision_service.start()
 
-@app.on_event("shutdown")
-def shutdown_event():
-    vision_service.stop()
 
 @app.get("/")
 def read_root():
@@ -332,11 +337,13 @@ def update_settings(req: SettingsUpdateRequest):
 # --- Video Feed Stream (Motion JPEG) ---
 def gen_video_frames():
     while True:
+        # Wait up to 30ms for new frame event, then stream immediately
+        vision_service.frame_event.wait(timeout=0.03)
+        vision_service.frame_event.clear()
         frame_bytes = vision_service.get_latest_jpeg()
         if frame_bytes:
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        time.sleep(0.015)  # ~64 FPS streaming interval
 
 @app.get("/api/video-feed")
 def video_feed():
@@ -344,6 +351,7 @@ def video_feed():
         gen_video_frames(),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
+
 
 # --- WebSocket Endpoint ---
 @app.websocket("/ws")
@@ -360,4 +368,9 @@ async def websocket_endpoint(websocket: WebSocket):
             except Exception:
                 pass
     except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
         state_manager.disconnect_ws(websocket)
+

@@ -5,9 +5,15 @@ Usage:
   python backend/scripts/run_autonomous_sorter.py --category plastic --cycles 5
 """
 
+import sys
+import os
 import argparse
 import logging
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from backend.robotics.control.autonomous_controller import AutonomousController
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 

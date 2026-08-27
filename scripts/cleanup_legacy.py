@@ -13,8 +13,10 @@ FILES_TO_REMOVE = [
     "config.py",
     "iiot_communicator.py",
     "test_system.py",
-    "robotic_hand.ino"
+    "robotic_hand.ino",
+    "robotic_arm_smooth_shoulder.ino"
 ]
+
 
 DIRS_TO_REMOVE = [
     "src",

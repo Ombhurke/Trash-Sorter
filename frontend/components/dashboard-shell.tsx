@@ -56,7 +56,7 @@ export function DashboardShell() {
         {tab === 'dashboard' && (
           <div className="grid gap-4 xl:grid-cols-3">
             <div className="xl:col-span-2">
-              <LiveCameraCard telemetry={data} onToggleDetection={toggleDetection} />
+              <LiveCameraCard telemetry={data} onToggleCamera={toggleDetection} />
             </div>
             <LastDetectionCard telemetry={data} />
             <StatisticsCard telemetry={data} />
@@ -78,7 +78,7 @@ export function DashboardShell() {
         {tab === 'camera' && (
           <div className="grid gap-4 xl:grid-cols-3">
             <div className="xl:col-span-2">
-              <LiveCameraCard telemetry={data} onToggleDetection={toggleDetection} />
+              <LiveCameraCard telemetry={data} onToggleCamera={toggleDetection} />
             </div>
             <div className="flex flex-col gap-4">
               <LastDetectionCard telemetry={data} />

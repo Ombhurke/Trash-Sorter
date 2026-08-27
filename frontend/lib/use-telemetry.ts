@@ -13,18 +13,20 @@ const HOME_ANGLES = { base: 90, shoulder: 30, elbow: 140, wrist: 110, gripper: 1
 const INITIAL: Telemetry = {
   state: 'WAITING',
   mode: 'AUTONOMOUS',
-  detectionActive: false,
-  fps: 29.8,
+  detectionActive: true,
+  fps: 60.0,
   thinkingProgress: 0,
   arm: { ...HOME_ANGLES },
+
   lastDetection: {
     id: 'seed',
     category: 'PLASTIC',
-    label: 'Plastic Bottle',
-    confidence: 98.6,
+    label: 'Waiting for Waste Item',
+    confidence: 0.0,
     code: 'P',
-    timestamp: '2026-01-01T10:32:45.000Z',
+    timestamp: '',
   },
+
   counts: { PLASTIC: 38, PAPER: 27, METAL: 19, GLASS: 14, CARDBOARD: 16 },
   health: [
     { key: 'arduino', label: 'Arduino Uno Connected', detail: '19200 Baud · COM3', ok: true },

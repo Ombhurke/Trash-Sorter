@@ -50,23 +50,28 @@ class DashboardStateManager:
         
         self.state = self.STATE_WAITING
         self.mode = self.MODE_AUTONOMOUS
-        self.detection_active = False
+        self.detection_active = True
         self.thinking_progress = 0
+
         self.thinking_duration = getattr(settings, "THINKING_DURATION", 5.0)
         self.fps = 29.8
         self.thinking_start_time = None
+
         self.accumulated_scores = defaultdict(float)
         self.sample_count = 0
-        self.active_timer: Optional[threading.Timer] = None
+        self.no_detection_count = 0
 
+
+        self.active_timer: Optional[threading.Timer] = None
         self.last_detection = {
-            "id": "seed",
+            "id": None,
             "category": "PLASTIC",
-            "label": "Plastic Bottle",
-            "confidence": 98.6,
+            "label": "Waiting for Waste Item",
+            "confidence": 0.0,
             "code": "P",
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+            "timestamp": None
         }
+
 
         self.active_websockets: List[WebSocket] = []
         self.loop = None
@@ -114,9 +119,10 @@ class DashboardStateManager:
             if not loop or not loop.is_running():
                 try:
                     import asyncio
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.get_running_loop()
                 except Exception:
-                    pass
+                    loop = None
+
 
             if loop and loop.is_running():
                 for ws in list(self.active_websockets):
@@ -171,21 +177,33 @@ class DashboardStateManager:
                     self.thinking_progress = 0
                     self.accumulated_scores.clear()
                     self.sample_count = 0
-                    logging.info("[STATE MACHINE] Item detected. Entering THINKING state.")
+                    self.no_detection_count = 0
+                    logging.info(f"[STATE MACHINE] Waste item detected [{best_cat}]. Entering THINKING state.")
 
             elif self.state == self.STATE_THINKING:
-                if is_valid and analysis:
+                if is_valid and analysis and best_cat:
+                    self.no_detection_count = 0
                     probs = analysis.get("probabilities", {})
                     for cat_key, prob in probs.items():
                         self.accumulated_scores[cat_key] += prob
                     self.sample_count += 1
+                else:
+                    self.no_detection_count = getattr(self, "no_detection_count", 0) + 1
+                    # If object was removed for ~0.6s, cancel thinking and return to waiting
+                    if self.no_detection_count >= 6:
+                        self.state = self.STATE_WAITING
+                        self.thinking_progress = 0
+                        self.accumulated_scores.clear()
+                        self.sample_count = 0
+                        self.broadcast_telemetry()
+                        return
 
                 elapsed = current_time - self.thinking_start_time
                 duration = getattr(self, "thinking_duration", settings.THINKING_DURATION)
                 self.thinking_progress = min(100, int((elapsed / duration) * 100))
 
                 if elapsed >= duration:
-                    if self.sample_count > 0 and self.accumulated_scores:
+                    if self.sample_count >= 2 and self.accumulated_scores:
                         final_cat_key = max(self.accumulated_scores, key=self.accumulated_scores.get)
                         avg_prob = self.accumulated_scores[final_cat_key] / self.sample_count
 
@@ -227,6 +245,7 @@ class DashboardStateManager:
                     else:
                         self.state = self.STATE_WAITING
                         self.thinking_progress = 0
+
 
         self.broadcast_telemetry()
 

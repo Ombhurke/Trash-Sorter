@@ -7,8 +7,10 @@ Run with: python scripts/run_fullstack.py
 import sys
 import os
 import time
+import shutil
 import subprocess
 import signal
+
 
 # Windows UTF-8 console output safe configuration
 if sys.platform.startswith("win"):
@@ -37,13 +39,18 @@ def main():
     try:
         # 1. Start Next.js Frontend Dev Server
         print("[1/2] Starting Next.js Web Dashboard (Port 3000)...")
+        pnpm_cmd = "pnpm.cmd" if sys.platform.startswith("win") else "pnpm"
         npm_cmd = "npm.cmd" if sys.platform.startswith("win") else "npm"
+        
+        # Check if pnpm is available, else fallback to npm
+        pkg_manager = pnpm_cmd if shutil.which("pnpm") else npm_cmd
         frontend_proc = subprocess.Popen(
-            [npm_cmd, "run", "dev"],
+            [pkg_manager, "run", "dev"],
             cwd=FRONTEND_DIR,
             shell=sys.platform.startswith("win"),
         )
         processes.append(frontend_proc)
+
 
         # 2. Start FastAPI Backend Server
         print("[2/2] Starting FastAPI Backend Server (Port 8000)...")

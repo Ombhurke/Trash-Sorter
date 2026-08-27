@@ -35,3 +35,8 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*", "phase1*", "phase2*", "robotics*", "ml*", "hardware*", "services*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["..", "."]
+testpaths = ["tests"]
+

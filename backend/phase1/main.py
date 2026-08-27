@@ -3,10 +3,12 @@ import time
 import logging
 import threading
 import queue
+import numpy as np
 from collections import defaultdict
 from backend.phase1 import config
 from backend.ml.inference.classifier import OptimizedWasteClassifier
 from backend.hardware.serial.iiot_communicator import IIoTCommunicator
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -190,24 +192,33 @@ def main():
     worker_thread.start()
 
     cap = cv2.VideoCapture(config.DEFAULT_CAMERA_INDEX)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.FRAME_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.FRAME_HEIGHT)
-
-    if not cap.isOpened():
-        logging.error(f"Cannot open camera index {config.DEFAULT_CAMERA_INDEX}.")
-        stop_event.set()
-        return
+    has_cam = cap.isOpened()
+    if has_cam:
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.FRAME_WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.FRAME_HEIGHT)
+        logging.info(f"Camera opened on index {config.DEFAULT_CAMERA_INDEX}.")
+    else:
+        logging.warning(f"Webcam index {config.DEFAULT_CAMERA_INDEX} not available. Using synthetic simulation frame.")
 
     print("\n=======================================================")
     print("  PHASE 1 ROBOTIC ARM TRASH SORTER")
     print("=======================================================\n")
 
+    frame_count = 0
     prev_time = time.time()
     try:
         while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
+            frame_count += 1
+            if has_cam:
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    frame = np.zeros((config.FRAME_HEIGHT, config.FRAME_WIDTH, 3), dtype=np.uint8)
+            else:
+                frame = np.zeros((config.FRAME_HEIGHT, config.FRAME_WIDTH, 3), dtype=np.uint8)
+                frame[:] = (20, 24, 30)
+                cx, cy = config.FRAME_WIDTH // 2, config.FRAME_HEIGHT // 2
+                cv2.circle(frame, (cx, cy), 45 + int(10 * np.sin(frame_count * 0.08)), (254, 242, 0), -1)
+                cv2.putText(frame, "PLASTIC BOTTLE", (cx - 70, cy + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
 
             curr_time = time.time()
             fps = 1.0 / (curr_time - prev_time + 1e-6)

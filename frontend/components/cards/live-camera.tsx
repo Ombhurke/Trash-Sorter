@@ -10,54 +10,39 @@ import {
   ScanLine,
   CheckCircle2,
   Power,
-  Sparkles,
 } from 'lucide-react'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
 import type { Telemetry } from '@/lib/types'
 import { CATEGORY_MAP } from '@/lib/types'
-import { api, VIDEO_FEED_URL } from '@/services/api'
+import { VIDEO_FEED_URL } from '@/services/api'
 
 export function LiveCameraCard({
   telemetry,
-  onToggleDetection,
+  onToggleCamera,
 }: {
   telemetry: Telemetry
-  onToggleDetection?: () => void
+  onToggleCamera?: () => void
 }) {
-  // Starts OFF by default on load: Camera will NOT turn on until user clicks "Turn On Cam"
-  const [cameraEnabled, setCameraEnabled] = useState(false)
   const [hud, setHud] = useState(true)
   const [streamError, setStreamError] = useState(false)
   const [streamKey, setStreamKey] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Single Source of Truth from global telemetry state:
+  const isCameraActive = telemetry.detectionActive ?? false
+
   const det = telemetry.lastDetection
-  const meta = CATEGORY_MAP[det.category] ?? CATEGORY_MAP.PLASTIC
-  const isDetectionActive = (telemetry.detectionActive ?? false) && cameraEnabled
+  const isSeed = !det?.id || det.id === 'seed' || !det.category || det.confidence === 0
+  const meta = CATEGORY_MAP[det?.category] ?? CATEGORY_MAP.PLASTIC
   const isThinking = telemetry.state === 'THINKING'
   const isOperating = telemetry.state === 'OPERATING'
 
-  const handleToggleCamera = async () => {
-    const nextState = !cameraEnabled
-    setCameraEnabled(nextState)
-    if (nextState) {
-      setStreamError(false)
-      setStreamKey((prev) => prev + 1)
-      try {
-        await api.startDetection()
-      } catch (err) {
-        console.error('Failed to start camera hardware:', err)
-      }
-    } else {
-      try {
-        await api.stopDetection()
-      } catch (err) {
-        console.error('Failed to release camera hardware:', err)
-      }
-    }
-    if (onToggleDetection) {
-      onToggleDetection()
+  const handleToggle = () => {
+    setStreamError(false)
+    setStreamKey((prev) => prev + 1)
+    if (onToggleCamera) {
+      onToggleCamera()
     }
   }
 
@@ -83,22 +68,22 @@ export function LiveCameraCard({
       bodyClassName="p-3"
       action={
         <div className="flex items-center gap-2">
-          {/* Main Turn On / Turn Off Camera & Detection Button */}
+          {/* Main Global Turn On / Turn Off Camera Button */}
           <button
             type="button"
-            onClick={handleToggleCamera}
+            onClick={handleToggle}
             className={cn(
               'flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold shadow-xs transition-all duration-200',
-              cameraEnabled && isDetectionActive
-                ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-300 hover:bg-rose-50 hover:text-rose-700 hover:ring-rose-300'
+              isCameraActive
+                ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-300 hover:bg-rose-100'
                 : 'bg-sky-600 text-white hover:bg-sky-700 shadow-md animate-pulse'
             )}
           >
-            {cameraEnabled && isDetectionActive ? (
+            {isCameraActive ? (
               <>
                 <span className="relative flex size-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                  <span className="relative inline-flex size-2 rounded-full bg-rose-500" />
                 </span>
                 <Square className="size-3 fill-current" />
                 <span>TURN OFF CAM</span>
@@ -128,9 +113,9 @@ export function LiveCameraCard({
         ref={containerRef}
         className="relative aspect-video w-full overflow-hidden rounded-xl bg-slate-950 ring-1 ring-border shadow-inner"
       >
-        {cameraEnabled ? (
+        {isCameraActive ? (
           !streamError ? (
-            /* Single Real-Time Live MJPEG Stream */
+            /* Real-Time Live Stream (Mounted ONLY when camera is active) */
             <img
               key={streamKey}
               src={`${VIDEO_FEED_URL}?t=${streamKey}`}
@@ -139,7 +124,7 @@ export function LiveCameraCard({
               onError={() => setStreamError(true)}
             />
           ) : (
-            /* Error & Retry Fallback */
+            /* Stream Error & Retry Fallback */
             <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-slate-950 p-6 text-center text-slate-400">
               <div className="grid size-12 place-items-center rounded-2xl bg-slate-900 ring-1 ring-white/10">
                 <Camera className="size-6 text-slate-500" />
@@ -159,7 +144,7 @@ export function LiveCameraCard({
             </div>
           )
         ) : (
-          /* Camera Standby Screen (Default on Load) */
+          /* Camera Standby Screen (Displayed when camera is closed / paused) */
           <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-gradient-to-b from-slate-900 via-slate-950 to-black p-6 text-center">
             <div className="grid size-16 place-items-center rounded-2xl bg-slate-800/90 ring-1 ring-white/10 shadow-lg">
               <Power className="size-8 text-sky-400" />
@@ -172,7 +157,7 @@ export function LiveCameraCard({
             </div>
             <button
               type="button"
-              onClick={handleToggleCamera}
+              onClick={handleToggle}
               className="flex items-center gap-2 rounded-xl bg-sky-600 px-6 py-3 text-xs font-bold text-white shadow-lg shadow-sky-500/30 transition-all hover:bg-sky-500 hover:scale-105 active:scale-95"
             >
               <Play className="size-4 fill-white" />
@@ -182,7 +167,7 @@ export function LiveCameraCard({
         )}
 
         {/* Top-Left Live Status Badge */}
-        {cameraEnabled && (
+        {isCameraActive && (
           <div className="absolute left-3 top-3 flex items-center gap-2 rounded-md bg-black/70 px-2.5 py-1 font-mono text-[11px] backdrop-blur-md ring-1 ring-white/10 z-10">
             <span
               className={cn(
@@ -191,46 +176,44 @@ export function LiveCameraCard({
                   ? 'bg-sky-400 animate-pulse'
                   : isThinking
                   ? 'bg-amber-400 animate-ping'
-                  : isDetectionActive
-                  ? 'bg-emerald-400 animate-status-blink shadow-[0_0_8px_#10b981]'
-                  : 'bg-slate-500'
+                  : 'bg-emerald-400 animate-status-blink shadow-[0_0_8px_#10b981]'
               )}
             />
             <span className="font-bold tracking-wider text-white">
               {isOperating
                 ? 'ARM THROWING'
                 : isThinking
-                ? `IDENTIFYING TRASH (5s)`
-                : isDetectionActive
-                ? 'CAM LIVE · WAITING FOR TRASH'
-                : 'STANDBY'}
+                ? `IDENTIFYING TRASH (3s)`
+                : 'CAM LIVE · WAITING FOR TRASH'}
             </span>
           </div>
         )}
 
         {/* Top-Right FPS Counter */}
-        {cameraEnabled && (
+        {isCameraActive && (
           <div className="absolute right-3 top-3 rounded-md bg-black/70 px-2.5 py-1 font-mono text-[11px] tracking-wider text-sky-400 backdrop-blur-md ring-1 ring-white/10 z-10">
             {telemetry.fps.toFixed(1)} FPS
           </div>
         )}
 
         {/* Floating Bottom Detection & Throw Bar */}
-        {cameraEnabled && hud && (
+        {isCameraActive && hud && (!isSeed || isThinking || isOperating) && (
           <div className="absolute bottom-3 inset-x-3 flex items-center justify-between pointer-events-none z-10">
-            <div
-              className="flex items-center gap-2 rounded-lg bg-black/80 px-3 py-1.5 font-mono text-xs font-bold backdrop-blur-md ring-1 ring-white/10"
-              style={{ borderColor: `${meta.color}60` }}
-            >
-              <span className="size-2 rounded-full" style={{ background: meta.color }} />
-              <span className="text-white">{meta.label.toUpperCase()}</span>
-              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-sky-300">
-                [{det.code}]
-              </span>
-              <span className="text-slate-400">·</span>
-              <span style={{ color: meta.color }}>{det.confidence.toFixed(1)}%</span>
-              <span className="text-[11px] text-slate-300 font-normal">➔ {meta.bin}</span>
-            </div>
+            {!isSeed && (
+              <div
+                className="flex items-center gap-2 rounded-lg bg-black/80 px-3 py-1.5 font-mono text-xs font-bold backdrop-blur-md ring-1 ring-white/10"
+                style={{ borderColor: `${meta.color}60` }}
+              >
+                <span className="size-2 rounded-full" style={{ background: meta.color }} />
+                <span className="text-white">{meta.label.toUpperCase()}</span>
+                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-sky-300">
+                  [{det?.code ?? 'P'}]
+                </span>
+                <span className="text-slate-400">·</span>
+                <span style={{ color: meta.color }}>{(det?.confidence ?? 0).toFixed(1)}%</span>
+                <span className="text-[11px] text-slate-300 font-normal">➔ {meta.bin}</span>
+              </div>
+            )}
 
             {isOperating ? (
               <div className="flex items-center gap-1.5 rounded-lg bg-sky-500/20 px-3 py-1.5 font-mono text-xs font-bold text-sky-300 backdrop-blur-md ring-1 ring-sky-400/50 animate-pulse">
@@ -240,7 +223,7 @@ export function LiveCameraCard({
             ) : isThinking ? (
               <div className="flex items-center gap-1.5 rounded-lg bg-amber-500/20 px-3 py-1.5 font-mono text-xs font-bold text-amber-300 backdrop-blur-md ring-1 ring-amber-400/50">
                 <span className="size-2 rounded-full bg-amber-400 animate-ping" />
-                <span>SAMPLING (5s Consensus: {telemetry.thinkingProgress}%)</span>
+                <span>IDENTIFYING ({telemetry.thinkingProgress}%)</span>
               </div>
             ) : null}
           </div>
@@ -248,10 +231,10 @@ export function LiveCameraCard({
       </div>
 
       <div className="mt-2.5 flex items-center justify-between px-1 font-mono text-[11px] text-slate-500">
-        <span>YOLOv8 Engine · 1280×720 @ 64 FPS</span>
+        <span>YOLOv8 + Contour Engine · 1280×720 @ 60 FPS</span>
         <span>
-          mode: {telemetry.mode} · 5s cycle · Camera:{' '}
-          {cameraEnabled && isDetectionActive ? 'ACTIVE' : 'STANDBY (OFF)'}
+          mode: {telemetry.mode} · Camera:{' '}
+          {isCameraActive ? 'ACTIVE (LIVE)' : 'STANDBY (OFF)'}
         </span>
       </div>
     </Panel>

@@ -1,5 +1,4 @@
-import os
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Veg QX — Robotic Arm Sorter IoT"
@@ -20,8 +19,7 @@ class Settings(BaseSettings):
     THINKING_DURATION: float = 5.0
     CONFIDENCE_THRESHOLD: float = 0.45
 
-    class Config:
-        env_file = ".env"
-        extra = "allow"
+    model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
 settings = Settings()
+
